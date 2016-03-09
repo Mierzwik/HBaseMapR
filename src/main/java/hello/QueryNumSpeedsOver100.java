@@ -69,6 +69,8 @@ public class QueryNumSpeedsOver100 {
         public static final byte[] CF = "freeway_loopdata".getBytes();
         public static final byte[] ATTR1 = "speed".getBytes();
         public static final byte[] ATTR2 = "starttime".getBytes();
+        public static final byte[] ATTR3 = "volume".getBytes();
+        public static final byte[] ATTR4 = "detectorid".getBytes();
 
         private final IntWritable ONE = new IntWritable(1);
         private Text text = new Text();
@@ -76,7 +78,8 @@ public class QueryNumSpeedsOver100 {
         public void map(ImmutableBytesWritable row, Result value, Context context) throws IOException, InterruptedException {
 
             try {
-                Query1(value, context);
+                //Query1(value, context);
+                Query2(value, context);
             } catch (ParseException e) {
                 //do nothing - invalid row
             }
@@ -138,6 +141,30 @@ public class QueryNumSpeedsOver100 {
                     context.write(text, new IntWritable(speed));
                     text.set("Total speed records");
                     context.write(text, ONE);
+            }
+        }
+        private void Query2(Result value, Context context) throws IOException, InterruptedException, ParseException {
+            String val = Bytes.toString(value.getValue(CF, ATTR3));
+            String rowTime = Bytes.toString(value.getValue(CF, ATTR2));
+            String detectorID = Bytes.toString(value.getValue(CF, ATTR4));
+
+            // Freeway Detector IDs for "Foster NB": 1361, 1362, 1363
+            String detectorIDs[] = new String[] {"1361", "1362", "1363"};
+
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss-SS");
+            Date time = format.parse(rowTime);
+            Date startTime = format.parse("2011-09-21 00:00:00-00");
+            Date endTime = format.parse("2011-09-21 23:59:59-59");
+
+            // if detectorID is "Foster NB", need to check Freeway_Detectors table, and time is between startTime and endTime
+            if (!val.isEmpty() && !val.equals("volume")) {
+                Integer volume = Integer.parseInt(val);
+                boolean start = time.equals(startTime) || time.after(startTime);
+                boolean end = time.equals(endTime) || time.before(endTime);
+                if(start && end && Arrays.asList(detectorIDs).contains(detectorID)) {
+                    text.set("Total Volume:");
+                    context.write(text, new IntWritable(volume));
+                }
             }
         }
     }
